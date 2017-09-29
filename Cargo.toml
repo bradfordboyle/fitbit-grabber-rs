@@ -1,0 +1,6 @@
+[package]
+name = "fitbit-grabber"
+version = "0.1.0"
+authors = ["Bradford D. Boyle <bradford.d.boyle@gmail.com>"]
+
+[dependencies]
