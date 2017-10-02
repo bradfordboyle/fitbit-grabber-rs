@@ -24,7 +24,8 @@ fn main() {
     let dates = DateRange::from(start);
 
     for d in dates {
-        activities_heart(&d).expect("error fetching data for date")
+        activities_heart(&d).expect("error fetching data for date");
+        activities_step(&d).expect("error fetching data for date");
     }
 }
 
@@ -35,12 +36,24 @@ fn start_arg(mut argv: env::Args) -> Result<NaiveDate, String> {
 }
 
 fn activities_heart(date: &NaiveDate) -> Result<(), String> {
+    let url = format!("https://api.fitbit.com/1/user/-/activities/heart/date/{}/1d.json",
+                      date.format("%Y-%m-%d"));
+    let filename = format!("heart-rate-{}.json", date);
+    get_data(&url, &filename)
+}
+
+fn activities_step(date: &NaiveDate) -> Result<(), String> {
+    let url = format!("https://api.fitbit.com/1/user/-/activities/steps/date/{}/1d.json",
+                      date.format("%Y-%m-%d"));
+
+    let filename = format!("steps-{}.json", date);
+    get_data(&url, &filename)
+
+}
+
+fn get_data(url: &str, filename: &str) -> Result<(), String> {
     let token = load_token(".token");
 
-    let url = format!("https://api.fitbit.com/1/user/-/activities/heart/date/{}/1d.json",
-                      format!("{}", date.format("%Y-%m-%d")));
-    // TODO read from config file
-    // let url = format!("http://localhost:8080/{}/1d.json", date);
     let uri = url.parse::<Uri>().map_err(|err: UriError| String::from(err.description()))?;
 
     let mut req = Request::new(Method::Get, uri);
@@ -52,7 +65,7 @@ fn activities_heart(date: &NaiveDate) -> Result<(), String> {
     let connector = HttpsConnector::new(4, &handle).map_err(err_handler)?;
     let client = Client::configure().connector(connector).build(&handle);
 
-    let filename = format!("{}.json", date);
+
     let path = Path::new(&filename);
     let mut file = File::create(&path).map_err(err_handler)?;
 
