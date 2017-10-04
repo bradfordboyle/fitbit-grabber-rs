@@ -9,6 +9,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::time;
+use std::thread;
 
 use chrono::{NaiveDate, Utc};
 use chrono::format::ParseError;
@@ -23,9 +25,12 @@ fn main() {
     let start = start_arg(env::args()).expect("error parsing start date");
     let dates = DateRange::from(start);
 
+    let delay = time::Duration::new(48, 0);
+
     for d in dates {
         activities_heart(&d).expect("error fetching data for date");
         activities_step(&d).expect("error fetching data for date");
+        thread::sleep(delay);
     }
 }
 
