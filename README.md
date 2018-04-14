@@ -1,7 +1,10 @@
 # fitbit-grabber
-This is a small utility for fetching data from the FitBit web API. It currently supports:
+This is a small utility for fetching data from the FitBit web API. It currently
+supports:
 
 - Heart Rate
+- Steps
+- User Profile
 
 ## Building
 
@@ -11,18 +14,36 @@ cargo build [--release]
 
 ## Using
 
-You will need to have an OAuth 2.0 token to use `fitbit-grabber`. The reason for this requirement is that intraday heart rate time series data is only available for persoanl applications.
+Run `fitbit-grabber help` for a list of available subcommands.
 
-**TODO** Document setting up an application
+To use `fitbit-grabber`, you will need to have an
+
+1. client ID
+2. client secret
+
+To obtain a client ID and secret, [register an application][].
+
+1. For "OAuth 2.0 Application Type", select "Personal". The reason for this
+   requirement is that intraday series data is only available for persoanl
+   applications.
+2. For "Callback URL", enter "http://localhost:8080".
+
+After completing the registration, you will need to export the client id and
+secret as environmner variables:
 
 ```sh
-./target/[debgug|release]/fitbit-grabber <starting date range>
+export FITBIT_CLIENT_ID=<client-id>
+export FITBIT_CLIENT_SECRET=<client-secret>
 ```
 
-For example
+### Requesting an OAuth 2.0 Token
+
+You will need to first generate and store a token for subsequent API calls
 
 ```sh
-./target/release/fitbit-grabber 2017-10-01
+./fitbit-grabber token
 ```
 
-If everything works ok, you should have one JSON file for every date from the given starting date to today.
+Copy the printed token and save it in a file called ".token"
+
+[register an application]: https://dev.fitbit.com/apps/new
