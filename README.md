@@ -44,6 +44,7 @@ You will need to first generate and store a token for subsequent API calls
 ./fitbit-grabber token
 ```
 
-Copy the printed token and save it in a file called ".token"
+If the above command is successful, the OAuth 2.0 token will be stored in a file
+called ".token" in the working directory.
 
 [register an application]: https://dev.fitbit.com/apps/new

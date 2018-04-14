@@ -2,19 +2,27 @@ extern crate chrono;
 extern crate clap;
 extern crate oauth2;
 extern crate reqwest;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 extern crate tiny_http;
 extern crate url;
 
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::path::Path;
 
 use chrono::NaiveDate;
 use clap::{App, Arg, SubCommand};
 use oauth2::{AuthType, Config};
 use reqwest::header::{Authorization, Bearer, Headers};
 use reqwest::Method;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Token(oauth2::Token);
 
 struct FitbitClient {
     client: reqwest::Client,
@@ -23,9 +31,11 @@ struct FitbitClient {
 }
 
 impl FitbitClient {
-    pub fn new(token: String) -> FitbitClient {
+    pub fn new(token: Token) -> FitbitClient {
         let mut headers = Headers::new();
-        headers.set(Authorization(Bearer { token: token }));
+        headers.set(Authorization(Bearer {
+            token: token.0.access_token,
+        }));
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
@@ -100,7 +110,7 @@ fn main() {
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .get_matches();
 
-    let token = load_token(".token");
+    let token = load_token(".token").unwrap();
     let f = FitbitClient::new(token);
 
     if let Some(matches) = matches.subcommand_matches("heart") {
@@ -128,29 +138,30 @@ fn main() {
             .expect("Missing the FITBIT_CLIENT_SECRET environment variable.");
 
         let token = get_token(&fitbit_client_id, &fitbit_client_secret).unwrap();
+        let json = serde_json::to_string(&token).unwrap();
         // TODO save the token as JSON
-        println!("{}", token.access_token);
+        let path = Path::new(".token");
+        let display = path.display();
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+            Ok(file) => file,
+        };
+
+        match file.write_all(json.as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+            Ok(_) => (),
+        }
+        println!("{}", json);
     }
 }
 
-fn load_token(filename: &str) -> String {
+fn load_token(filename: &str) -> Result<Token, String> {
     let mut f = File::open(filename).expect("file not found");
     let mut contents = String::new();
     f.read_to_string(&mut contents)
         .expect("unable to read file");
 
-    contents.trim().to_string()
-}
-
-fn new_load_token() -> String {
-    let fitbit_client_id =
-        env::var("FITBIT_CLIENT_ID").expect("Missing the FITBIT_CLIENT_ID environment variable.");
-    let fitbit_client_secret = env::var("FITBIT_CLIENT_SECRET")
-        .expect("Missing the FITBIT_CLIENT_SECRET environment variable.");
-
-    let token = get_token(&fitbit_client_id, &fitbit_client_secret).unwrap();
-    println!("Token: {:?}", token);
-    token.access_token
+    serde_json::from_str::<Token>(contents.trim()).map_err(stringify)
 }
 
 fn get_token(client_id: &str, client_secret: &str) -> Result<oauth2::Token, String> {
