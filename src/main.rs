@@ -18,7 +18,7 @@ use std::path::Path;
 use chrono::NaiveDate;
 use clap::{App, Arg, SubCommand};
 use oauth2::{AuthType, Config};
-use reqwest::header::{Authorization, Bearer, Headers};
+use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -27,7 +27,6 @@ struct Token(oauth2::Token);
 struct FitbitClient {
     client: reqwest::Client,
     base: url::Url,
-    user_agent: String,
 }
 
 impl FitbitClient {
@@ -36,6 +35,7 @@ impl FitbitClient {
         headers.set(Authorization(Bearer {
             token: token.0.access_token,
         }));
+        headers.set(UserAgent::new("fitbit-grabber-rs (0.1.0)"));
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
@@ -45,7 +45,6 @@ impl FitbitClient {
         FitbitClient {
             client: client,
             base: url::Url::parse("https://api.fitbit.com/1/").unwrap(),
-            user_agent: "fitbit-grabber-rs (0.1.0)".to_string(),
         }
     }
 
@@ -175,6 +174,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
+        .subcommand(SubCommand::with_name("user").about("get user profile"))
         .get_matches();
 
     let fitbit_client_id =
@@ -184,54 +184,54 @@ fn main() {
     let auth = FitbitAuth::new(&fitbit_client_id, &fitbit_client_secret);
 
     if let Some(_) = matches.subcommand_matches("token") {
-        let token = auth.get_token().expect("unable to get a new token");
-        save_token(".token", token)
+        auth.get_token()
+            .and_then(|token| save_token(".token", token))
+            .expect("unable to obtain token");
     }
 
     if let Some(_) = matches.subcommand_matches("refresh-token") {
-        let old_token = load_token(".token").unwrap();
-        let token = auth.exchange_refresh_token(old_token)
-            .expect("unable to exchange refresh token for new access token");
-
-        save_token(".token", token);
+        load_token(".token")
+            .and_then(|token| auth.exchange_refresh_token(token))
+            .and_then(|token| save_token(".token", token))
+            .expect("unable to refresh token");
     }
 
     let token = load_token(".token").unwrap();
     let f = FitbitClient::new(token);
 
     if let Some(matches) = matches.subcommand_matches("heart") {
-        let date = matches
+        let heart_rate_data = matches
             .value_of("date")
             .ok_or("please give a starting date".to_string())
             .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .unwrap();
-        println!("{}", f.heart(date).unwrap());
+            .and_then(|date| f.heart(date))
+            .expect("unable to fetch heart rate data for given date");
+        println!("{}", heart_rate_data);
     }
 
     if let Some(matches) = matches.subcommand_matches("step") {
-        let date = matches
+        let step_data = matches
             .value_of("date")
             .ok_or("please give a starting date".to_string())
             .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .unwrap();
-        println!("{}", f.step(date).unwrap());
+            .and_then(|date| f.step(date))
+            .expect("unable to fetch step data for given date");
+        println!("{}", step_data);
+    }
+
+    if let Some(_) = matches.subcommand_matches("user") {
+        let user_profile = f.user().expect("unable to fetch user profile");
+        println!("{}", user_profile);
     }
 }
 
-fn save_token(filename: &str, token: oauth2::Token) {
+fn save_token(filename: &str, token: oauth2::Token) -> Result<(), String> {
     let json = serde_json::to_string(&token).unwrap();
-    // TODO save the token as JSON
-    let path = Path::new(".token");
-    let display = path.display();
-    let mut file = match File::create(&path) {
-        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
-        Ok(file) => file,
-    };
+    let path = Path::new(filename);
 
-    match file.write_all(json.as_bytes()) {
-        Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
-        Ok(_) => (),
-    }
+    File::create(&path)
+        .and_then(|mut file| file.write_all(json.as_bytes()))
+        .map_err(stringify)
 }
 
 fn load_token(filename: &str) -> Result<Token, String> {
@@ -241,57 +241,6 @@ fn load_token(filename: &str) -> Result<Token, String> {
         .expect("unable to read file");
 
     serde_json::from_str::<Token>(contents.trim()).map_err(stringify)
-}
-
-fn get_token(client_id: &str, client_secret: &str) -> Result<oauth2::Token, String> {
-    let auth_url = "https://www.fitbit.com/oauth2/authorize";
-    let token_url = "https://api.fitbit.com/oauth2/token";
-
-    // Set up the config for the Github OAuth2 process.
-    let mut config = Config::new(client_id, client_secret, auth_url, token_url);
-
-    // config = config.set_response_type(ResponseType::Token);
-    config = config.set_auth_type(AuthType::BasicAuth);
-
-    // This example is requesting access to the user's public repos and email.
-    config = config.add_scope("activity");
-    config = config.add_scope("heartrate");
-    config = config.add_scope("profile");
-
-    // This example will be running its own server at localhost:8080.
-    // See below for the server implementation.
-    config = config.set_redirect_url("http://localhost:8080");
-
-    // Generate the authorization URL to which we'll redirect the user.
-    let authorize_url = config.authorize_url();
-
-    println!(
-        "Open this URL in your browser:\n{}\n",
-        authorize_url.to_string()
-    );
-
-    // FIXME avoid unwrap here
-    let server = tiny_http::Server::http("localhost:8080").unwrap();
-    let request = server.recv().map_err(stringify)?;
-    let url = request.url().to_string();
-    let response = tiny_http::Response::from_string("Go back to your terminal :)");
-    request.respond(response).map_err(stringify)?;
-
-    let code = {
-        // remove leading '/?'
-        let mut parsed = url::form_urlencoded::parse(url[2..].as_bytes());
-
-        let (_, value) = parsed
-            .find(|pair| {
-                let &(ref key, _) = pair;
-                key == "code"
-            })
-            .ok_or("query param `code` not found")?;
-        value.to_string()
-    };
-
-    // Exchange the code with a token.
-    config.exchange_code(code).map_err(stringify)
 }
 
 fn stringify<E: Error>(e: E) -> String {
