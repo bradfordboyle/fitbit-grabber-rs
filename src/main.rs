@@ -49,12 +49,8 @@ impl FitbitClient {
     }
 
     pub fn user(&self) -> Result<String, String> {
-        let url = self.base.join("user/-/profile.json").map_err(stringify)?;
-        self.client
-            .request(reqwest::Method::Get, url)
-            .send()
-            .and_then(|mut r| r.text())
-            .map_err(stringify)
+        let path = "user/-/profile.json";
+        self.do_get(&path)
     }
 
     pub fn heart(&self, date: NaiveDate) -> Result<String, String> {
@@ -62,12 +58,7 @@ impl FitbitClient {
             "user/-/activities/heart/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
-        let url = self.base.join(&path).map_err(stringify)?;
-        self.client
-            .request(Method::Get, url)
-            .send()
-            .and_then(|mut r| r.text())
-            .map_err(stringify)
+        self.do_get(&path)
     }
 
     pub fn step(&self, date: NaiveDate) -> Result<String, String> {
@@ -75,12 +66,7 @@ impl FitbitClient {
             "user/-/activities/steps/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
-        let url = self.base.join(&path).map_err(stringify)?;
-        self.client
-            .request(Method::Get, url)
-            .send()
-            .and_then(|mut r| r.text())
-            .map_err(stringify)
+        self.do_get(&path)
     }
 
     pub fn daily_activity_summary(&self, user_id: &str, date: NaiveDate) -> Result<String, String> {
