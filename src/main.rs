@@ -33,7 +33,7 @@ impl FitbitClient {
     pub fn new(token: Token) -> FitbitClient {
         let mut headers = Headers::new();
         headers.set(Authorization(Bearer {
-            token: token.0.access_token,
+            token: token.0.access_token.to_string(),
         }));
         headers.set(UserAgent::new("fitbit-grabber-rs (0.1.0)"));
 
@@ -75,6 +75,20 @@ impl FitbitClient {
             "user/-/activities/steps/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
+        let url = self.base.join(&path).map_err(stringify)?;
+        self.client
+            .request(Method::Get, url)
+            .send()
+            .and_then(|mut r| r.text())
+            .map_err(stringify)
+    }
+
+    pub fn daily_activity_summary(&self, user_id: &str, date: NaiveDate) -> Result<String, String> {
+        let path = format!("user/{}/activities/date/{}.json", user_id, date);
+        self.do_get(&path)
+    }
+
+    fn do_get(&self, path: &str) -> Result<String, String> {
         let url = self.base.join(&path).map_err(stringify)?;
         self.client
             .request(Method::Get, url)
@@ -175,54 +189,96 @@ fn main() {
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
         .subcommand(SubCommand::with_name("user").about("get user profile"))
+        .subcommand(
+            SubCommand::with_name("daily-activity-summary")
+                .about("get user profile")
+                .arg(
+                    Arg::with_name("user-id")
+                        .long("user")
+                        .required(false)
+                        .takes_value(true)
+                        .help("user if to fetch summary for"),
+                )
+                .arg(
+                    Arg::with_name("date")
+                        .long("date")
+                        .required(true)
+                        .takes_value(true)
+                        .help("date to fetch summary for"),
+                ),
+        )
         .get_matches();
 
+    let auth = get_auth_from_env();
+    let token = load_token(".token");
+
+    match matches.subcommand() {
+        ("token", Some(_)) => {
+            auth.get_token()
+                .and_then(|token| save_token(".token", token))
+                .expect("unable to obtain token");
+        }
+        ("refresh-token", Some(_)) => {
+            token
+                .and_then(|token| auth.exchange_refresh_token(token))
+                .and_then(|token| save_token(".token", token))
+                .expect("unable to refresh token");
+        }
+        ("heart", Some(sub_m)) => {
+            let client = token
+                .map(|t| FitbitClient::new(t))
+                .expect("unable to create Fitbit client");
+            let heart_rate_data = sub_m
+                .value_of("date")
+                .ok_or("please give a starting date".to_string())
+                .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
+                .and_then(|date| client.heart(date))
+                .expect("unable to fetch heart rate data for given date");
+            println!("{}", heart_rate_data);
+        }
+        ("step", Some(sub_m)) => {
+            let client = token
+                .map(|t| FitbitClient::new(t))
+                .expect("unable to create Fitbit client");
+            let step_data = sub_m
+                .value_of("date")
+                .ok_or("please give a starting date".to_string())
+                .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
+                .and_then(|date| client.step(date))
+                .expect("unable to fetch step data for given date");
+            println!("{}", step_data);
+        }
+        ("user", Some(_)) => {
+            let client = token
+                .map(|t| FitbitClient::new(t))
+                .expect("unable to create Fitbit client");
+            let user_profile = client.user().expect("unable to fetch user profile");
+            println!("{}", user_profile);
+        }
+        ("daily-activity-summary", Some(sub_m)) => {
+            let client = token
+                .map(|t| FitbitClient::new(t))
+                .expect("unable to create Fitbit client");
+            let summary = sub_m
+                .value_of("date")
+                .ok_or("please give a starting date".to_string())
+                .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
+                .and_then(|date| client.daily_activity_summary("-", date))
+                .expect("unable to fetch summary for given date");
+            println!("{}", summary);
+        }
+        (cmd, _) => {
+            panic!("Unknown command: {}", cmd);
+        }
+    }
+}
+
+fn get_auth_from_env() -> FitbitAuth {
     let fitbit_client_id =
         env::var("FITBIT_CLIENT_ID").expect("Missing the FITBIT_CLIENT_ID environment variable.");
     let fitbit_client_secret = env::var("FITBIT_CLIENT_SECRET")
         .expect("Missing the FITBIT_CLIENT_SECRET environment variable.");
-    let auth = FitbitAuth::new(&fitbit_client_id, &fitbit_client_secret);
-
-    if let Some(_) = matches.subcommand_matches("token") {
-        auth.get_token()
-            .and_then(|token| save_token(".token", token))
-            .expect("unable to obtain token");
-    }
-
-    if let Some(_) = matches.subcommand_matches("refresh-token") {
-        load_token(".token")
-            .and_then(|token| auth.exchange_refresh_token(token))
-            .and_then(|token| save_token(".token", token))
-            .expect("unable to refresh token");
-    }
-
-    let token = load_token(".token").unwrap();
-    let f = FitbitClient::new(token);
-
-    if let Some(matches) = matches.subcommand_matches("heart") {
-        let heart_rate_data = matches
-            .value_of("date")
-            .ok_or("please give a starting date".to_string())
-            .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .and_then(|date| f.heart(date))
-            .expect("unable to fetch heart rate data for given date");
-        println!("{}", heart_rate_data);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("step") {
-        let step_data = matches
-            .value_of("date")
-            .ok_or("please give a starting date".to_string())
-            .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .and_then(|date| f.step(date))
-            .expect("unable to fetch step data for given date");
-        println!("{}", step_data);
-    }
-
-    if let Some(_) = matches.subcommand_matches("user") {
-        let user_profile = f.user().expect("unable to fetch user profile");
-        println!("{}", user_profile);
-    }
+    FitbitAuth::new(&fitbit_client_id, &fitbit_client_secret)
 }
 
 fn save_token(filename: &str, token: oauth2::Token) -> Result<(), String> {
