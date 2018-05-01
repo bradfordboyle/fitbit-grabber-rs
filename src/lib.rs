@@ -3,18 +3,89 @@ extern crate oauth2;
 extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 extern crate tiny_http;
 extern crate url;
 
+use std::convert;
 use std::error::Error;
+use std::fmt;
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::path::Path;
 
 use chrono::NaiveDate;
 use oauth2::{AuthType, Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::{Client, Method};
 
+#[derive(Debug)]
+pub struct FitbitError;
+
+impl Error for FitbitError {
+    fn description(&self) -> &str {
+        "Something bad happened"
+    }
+}
+
+impl fmt::Display for FitbitError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Oh no, somthing bad went down")
+    }
+}
+
+impl convert::From<url::ParseError> for FitbitError {
+    fn from(err: url::ParseError) -> FitbitError {
+        FitbitError
+    }
+}
+
+impl convert::From<reqwest::Error> for FitbitError {
+    fn from(err: reqwest::Error) -> FitbitError {
+        FitbitError
+    }
+}
+
+impl convert::From<io::Error> for FitbitError {
+    fn from(err: io::Error) -> FitbitError {
+        FitbitError
+    }
+}
+
+impl convert::From<oauth2::TokenError> for FitbitError {
+    fn from(err: oauth2::TokenError) -> FitbitError {
+        FitbitError
+    }
+}
+
+impl convert::From<serde_json::Error> for FitbitError {
+    fn from(err: serde_json::Error) -> FitbitError {
+        FitbitError
+    }
+}
+
+type Result<T> = std::result::Result<T, FitbitError>;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Token(oauth2::Token);
+
+impl Token {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let json = serde_json::to_string(self).unwrap();
+        File::create(&path)
+            .and_then(|mut file| file.write_all(json.as_bytes()))?;
+        Ok(())
+    }
+
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Token> {
+        let mut f = File::open(path)?;
+        let mut contents = String::new();
+        f.read_to_string(&mut contents)?;
+        let token = serde_json::from_str::<Token>(contents.trim())?;
+
+        Ok(token)
+    }
+}
 
 pub struct FitbitClient {
     client: Client,
@@ -40,12 +111,12 @@ impl FitbitClient {
         }
     }
 
-    pub fn user(&self) -> Result<String, String> {
+    pub fn user(&self) -> Result<String> {
         let path = "user/-/profile.json";
         self.do_get(&path)
     }
 
-    pub fn heart(&self, date: NaiveDate) -> Result<String, String> {
+    pub fn heart(&self, date: NaiveDate) -> Result<String> {
         let path = format!(
             "user/-/activities/heart/date/{}/1d.json",
             date.format("%Y-%m-%d")
@@ -53,7 +124,7 @@ impl FitbitClient {
         self.do_get(&path)
     }
 
-    pub fn step(&self, date: NaiveDate) -> Result<String, String> {
+    pub fn step(&self, date: NaiveDate) -> Result<String> {
         let path = format!(
             "user/-/activities/steps/date/{}/1d.json",
             date.format("%Y-%m-%d")
@@ -61,18 +132,33 @@ impl FitbitClient {
         self.do_get(&path)
     }
 
-    pub fn daily_activity_summary(&self, user_id: &str, date: NaiveDate) -> Result<String, String> {
+    pub fn daily_activity_summary(&self, user_id: &str, date: NaiveDate) -> Result<String> {
         let path = format!("user/{}/activities/date/{}.json", user_id, date);
         self.do_get(&path)
     }
 
-    fn do_get(&self, path: &str) -> Result<String, String> {
-        let url = self.base.join(&path).map_err(stringify)?;
+    pub fn get_devices(&self) -> Result<String> {
+        let path = format!("user/-/devices.json");
+        self.do_get(&path)
+    }
+
+    pub fn get_alarms(&self, user_id: &str, tracker_id: &str) -> Result<String> {
+        let path = format!("user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
+        self.do_get(&path)
+    }
+
+    pub fn get_sleep_logs_for_date(&self, user_id: &str, tracker_id: &str) -> Result<String> {
+        let path = format!("user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
+        self.do_get(&path)
+    }
+
+    fn do_get(&self, path: &str) -> Result<String> {
+        let url = self.base.join(&path)?;
         self.client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
-            .map_err(stringify)
+            .map_err(convert::From::from)
     }
 }
 
@@ -91,9 +177,15 @@ impl FitbitAuth {
         config = config.set_auth_type(AuthType::BasicAuth);
 
         // This example is requesting access to the user's public repos and email.
-        config = config.add_scope("activity");
-        config = config.add_scope("heartrate");
-        config = config.add_scope("profile");
+        config = config.add_scope("activity")
+            .add_scope("heartrate")
+            .add_scope("location")
+            .add_scope("nutrition")
+            .add_scope("profile")
+            .add_scope("settings")
+            .add_scope("sleep")
+            .add_scope("social")
+            .add_scope("weight");
 
         // This example will be running its own server at localhost:8080.
         // See below for the server implementation.
@@ -102,7 +194,7 @@ impl FitbitAuth {
         FitbitAuth(config)
     }
 
-    pub fn get_token(&self) -> Result<Token, String> {
+    pub fn get_token(&self) -> Result<Token> {
         let authorize_url = self.0.authorize_url();
 
         println!(
@@ -112,10 +204,10 @@ impl FitbitAuth {
 
         // FIXME avoid unwrap here
         let server = tiny_http::Server::http("localhost:8080").unwrap();
-        let request = server.recv().map_err(stringify)?;
+        let request = server.recv()?;
         let url = request.url().to_string();
         let response = tiny_http::Response::from_string("Go back to your terminal :)");
-        request.respond(response).map_err(stringify)?;
+        request.respond(response)?;
 
         let code = {
             // remove leading '/?'
@@ -126,25 +218,22 @@ impl FitbitAuth {
                     let &(ref key, _) = pair;
                     key == "code"
                 })
-                .ok_or("query param `code` not found")?;
+                .ok_or(FitbitError)?;
+                // .ok_or("query param `code` not found")?;
             value.to_string()
         };
 
         // Exchange the code with a token.
-        self.0.exchange_code(code).map(Token).map_err(stringify)
+        self.0.exchange_code(code).map(Token).map_err(convert::From::from)
     }
 
-    pub fn exchange_refresh_token(&self, token: Token) -> Result<Token, String> {
+    pub fn exchange_refresh_token(&self, token: Token) -> Result<Token> {
         match token.0.refresh_token {
             Some(t) => self.0
                 .exchange_refresh_token(t)
                 .map(Token)
-                .map_err(stringify),
-            None => Err("No refresh token available".to_string()),
+                .map_err(convert::From::from),
+            None => Err(FitbitError),
         }
     }
-}
-
-fn stringify<E: Error>(e: E) -> String {
-    format!("{}", e)
 }
