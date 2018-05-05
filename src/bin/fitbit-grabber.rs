@@ -14,6 +14,7 @@ use std::str::FromStr;
 use clap::{App, Arg, SubCommand};
 use fitbit_grabber::{FitbitAuth, FitbitClient, FitbitError, Token};
 use fitbit_grabber::date;
+use fitbit_grabber::UserService;
 
 #[derive(Debug)]
 enum CliError {
@@ -97,7 +98,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
-        .subcommand(SubCommand::with_name("user").about("get user profile"))
+        .subcommand(SubCommand::with_name("user-profile").about("get user profile"))
         .subcommand(
             SubCommand::with_name("daily-activity-summary")
                 .about("get user profile")
@@ -161,12 +162,12 @@ fn main() {
                 .expect("unable to fetch step data for given date");
             println!("{}", step_data);
         }
-        ("user", Some(_)) => {
+        ("user-profile", Some(_)) => {
             let client = Token::load(".token")
                 .map(|token| FitbitClient::new(token))
                 .expect("unable to create Fitbit client");
 
-            let user_profile = client.user().expect("unable to fetch user profile");
+            let user_profile = client.user_profile().expect("unable to fetch user profile");
 
             println!("{}", user_profile);
         }

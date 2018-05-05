@@ -18,7 +18,10 @@ use oauth2::{AuthType, Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::{Client, Method};
 
+pub use self::user::UserService;
+
 pub mod date;
+mod user;
 
 #[derive(Debug)]
 pub enum FitbitError {
@@ -124,11 +127,6 @@ impl FitbitClient {
             client: client,
             base: url::Url::parse("https://api.fitbit.com/").unwrap(),
         }
-    }
-
-    pub fn user(&self) -> Result<String> {
-        let path = "1/user/-/profile.json";
-        self.do_get(&path)
     }
 
     pub fn heart(&self, date: &date::Date) -> Result<String> {
