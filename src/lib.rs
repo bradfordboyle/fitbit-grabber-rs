@@ -14,13 +14,22 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use chrono::NaiveDate;
 use oauth2::{AuthType, Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::{Client, Method};
 
+pub mod date;
+
 #[derive(Debug)]
-pub struct FitbitError;
+pub enum FitbitError {
+    DateParse(chrono::ParseError),
+    UrlParseError(url::ParseError),
+    ReqwestError(reqwest::Error),
+    IoError(io::Error),
+    TokenError(oauth2::TokenError),
+    JsonError(serde_json::Error),
+    Other(String)
+}
 
 impl Error for FitbitError {
     fn description(&self) -> &str {
@@ -35,32 +44,38 @@ impl fmt::Display for FitbitError {
 }
 
 impl convert::From<url::ParseError> for FitbitError {
-    fn from(err: url::ParseError) -> FitbitError {
-        FitbitError
+    fn from(err: url::ParseError) -> Self {
+        FitbitError::UrlParseError(err)
     }
 }
 
 impl convert::From<reqwest::Error> for FitbitError {
-    fn from(err: reqwest::Error) -> FitbitError {
-        FitbitError
+    fn from(err: reqwest::Error) -> Self {
+        FitbitError::ReqwestError(err)
     }
 }
 
 impl convert::From<io::Error> for FitbitError {
-    fn from(err: io::Error) -> FitbitError {
-        FitbitError
+    fn from(err: io::Error) -> Self {
+        FitbitError::IoError(err)
     }
 }
 
 impl convert::From<oauth2::TokenError> for FitbitError {
-    fn from(err: oauth2::TokenError) -> FitbitError {
-        FitbitError
+    fn from(err: oauth2::TokenError) -> Self {
+        FitbitError::TokenError(err)
     }
 }
 
 impl convert::From<serde_json::Error> for FitbitError {
-    fn from(err: serde_json::Error) -> FitbitError {
-        FitbitError
+    fn from(err: serde_json::Error) -> Self {
+        FitbitError::JsonError(err)
+    }
+}
+
+impl convert::From<chrono::ParseError> for FitbitError {
+    fn from(err: chrono::ParseError) -> Self {
+        FitbitError::DateParse(err)
     }
 }
 
@@ -107,48 +122,53 @@ impl FitbitClient {
 
         FitbitClient {
             client: client,
-            base: url::Url::parse("https://api.fitbit.com/1/").unwrap(),
+            base: url::Url::parse("https://api.fitbit.com/").unwrap(),
         }
     }
 
     pub fn user(&self) -> Result<String> {
-        let path = "user/-/profile.json";
+        let path = "1/user/-/profile.json";
         self.do_get(&path)
     }
 
-    pub fn heart(&self, date: NaiveDate) -> Result<String> {
+    pub fn heart(&self, date: &date::Date) -> Result<String> {
         let path = format!(
-            "user/-/activities/heart/date/{}/1d.json",
-            date.format("%Y-%m-%d")
+            "1/user/-/activities/heart/date/{}/1d.json",
+            date
         );
         self.do_get(&path)
     }
 
-    pub fn step(&self, date: NaiveDate) -> Result<String> {
+    pub fn step(&self, date: &date::Date) -> Result<String> {
         let path = format!(
-            "user/-/activities/steps/date/{}/1d.json",
-            date.format("%Y-%m-%d")
+            "1/user/-/activities/steps/date/{}/1d.json",
+            date
         );
         self.do_get(&path)
     }
 
-    pub fn daily_activity_summary(&self, user_id: &str, date: NaiveDate) -> Result<String> {
-        let path = format!("user/{}/activities/date/{}.json", user_id, date);
+    pub fn daily_activity_summary(&self, user_id: &str, date: &date::Date) -> Result<String> {
+        let path = format!("1/user/{}/activities/date/{}.json", user_id, date);
         self.do_get(&path)
     }
 
     pub fn get_devices(&self) -> Result<String> {
-        let path = format!("user/-/devices.json");
+        let path = format!("1/user/-/devices.json");
         self.do_get(&path)
     }
 
     pub fn get_alarms(&self, user_id: &str, tracker_id: &str) -> Result<String> {
-        let path = format!("user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
+        let path = format!("1/user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
         self.do_get(&path)
     }
 
-    pub fn get_sleep_logs_for_date(&self, user_id: &str, tracker_id: &str) -> Result<String> {
-        let path = format!("user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
+    pub fn get_sleep_logs_for_date(&self, date: &date::Date) -> Result<String> {
+        let path = format!("1.2/user/-/sleep/date/{}.json", date);
+        self.do_get(&path)
+    }
+
+    pub fn get_sleep_logs_list(&self) -> Result<String> {
+        let path = format!("1.2/user/-/sleep/list.json");
         self.do_get(&path)
     }
 
@@ -218,7 +238,7 @@ impl FitbitAuth {
                     let &(ref key, _) = pair;
                     key == "code"
                 })
-                .ok_or(FitbitError)?;
+                .ok_or(FitbitError::Other("query param `code` not found".to_string()))?;
                 // .ok_or("query param `code` not found")?;
             value.to_string()
         };
@@ -233,7 +253,7 @@ impl FitbitAuth {
                 .exchange_refresh_token(t)
                 .map(Token)
                 .map_err(convert::From::from),
-            None => Err(FitbitError),
+            None => Err(FitbitError::Other("no refresh token found".to_string())),
         }
     }
 }
