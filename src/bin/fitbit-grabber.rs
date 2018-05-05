@@ -12,23 +12,22 @@ use std::result;
 use std::str::FromStr;
 
 use clap::{App, Arg, SubCommand};
-use fitbit_grabber::{FitbitAuth, FitbitClient, FitbitError, Token};
 use fitbit_grabber::date;
-use fitbit_grabber::UserService;
+use fitbit_grabber::{FitbitAuth, FitbitClient, FitbitError, Token, UserService};
 
 #[derive(Debug)]
 enum CliError {
     Fitbit(FitbitError),
     Io(io::Error),
     Json(serde_json::Error),
-    MissingArg(String)
+    MissingArg(String),
 }
 
 impl Error for CliError {
     fn description(&self) -> &str {
         match *self {
             CliError::Fitbit(ref err) => err.description(),
-            _ => "Something bad happened"
+            _ => "Something bad happened",
         }
     }
 }
@@ -37,7 +36,7 @@ impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CliError::Fitbit(ref err) => write!(f, "Date Parse Error: {}", err),
-            _ => write!(f, "Oh no, something bad went down")
+            _ => write!(f, "Oh no, something bad went down"),
         }
     }
 }
@@ -119,13 +118,15 @@ fn main() {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("sleep-log").about("fetch sleep logs").arg(
-                Arg::with_name("date")
-                    .long("date")
-                    .required(true)
-                    .takes_value(true)
-                    .help("date to fetch data for"),
-            ),
+            SubCommand::with_name("sleep-log")
+                .about("fetch sleep logs")
+                .arg(
+                    Arg::with_name("date")
+                        .long("date")
+                        .required(true)
+                        .takes_value(true)
+                        .help("date to fetch data for"),
+                ),
         )
         .subcommand(SubCommand::with_name("sleep-log-list").about("get sleep logs list"))
         .get_matches();
@@ -191,7 +192,7 @@ fn main() {
                 .expect("unable to fetch summary");
 
             println!("{}", summary);
-        },
+        }
         ("get-devices", Some(_)) => {
             let client = Token::load(".token")
                 .map(|token| FitbitClient::new(token))
@@ -200,16 +201,18 @@ fn main() {
             let devices = client.get_devices().expect("unable to fetch devices");
 
             println!("{}", devices);
-        },
+        }
         ("get-alarms", Some(sub_m)) => {
             let client = Token::load(".token")
                 .map(|token| FitbitClient::new(token))
                 .expect("unable to create Fitbit client");
 
-            let tracker_id = sub_m.value_of("tracker-id")
+            let tracker_id = sub_m
+                .value_of("tracker-id")
                 .expect("please give tracker device id");
 
-            let alarms = client.get_alarms("-", tracker_id)
+            let alarms = client
+                .get_alarms("-", tracker_id)
                 .expect("unable to fetch alarms for given device");
 
             println!("{}", alarms);
@@ -230,7 +233,9 @@ fn main() {
                 .map(|token| FitbitClient::new(token))
                 .expect("unable to create Fitbit client");
 
-            let summary = client.get_sleep_logs_list().expect("unable to fetch summary");
+            let summary = client
+                .get_sleep_logs_list()
+                .expect("unable to fetch summary");
 
             println!("{}", summary);
         }
@@ -241,10 +246,10 @@ fn main() {
 }
 
 fn parse_date_from(matches: &clap::ArgMatches) -> Result<date::Date> {
-    matches.value_of("date")
+    matches
+        .value_of("date")
         .ok_or(CliError::MissingArg("date".to_string()))
         .and_then(|arg| date::Date::from_str(arg).map_err(From::from))
-
 }
 
 fn get_auth_from_env() -> FitbitAuth {

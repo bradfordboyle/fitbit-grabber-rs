@@ -31,7 +31,7 @@ pub enum FitbitError {
     IoError(io::Error),
     TokenError(oauth2::TokenError),
     JsonError(serde_json::Error),
-    Other(String)
+    Other(String),
 }
 
 impl Error for FitbitError {
@@ -90,8 +90,7 @@ pub struct Token(oauth2::Token);
 impl Token {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let json = serde_json::to_string(self).unwrap();
-        File::create(&path)
-            .and_then(|mut file| file.write_all(json.as_bytes()))?;
+        File::create(&path).and_then(|mut file| file.write_all(json.as_bytes()))?;
         Ok(())
     }
 
@@ -130,18 +129,12 @@ impl FitbitClient {
     }
 
     pub fn heart(&self, date: &date::Date) -> Result<String> {
-        let path = format!(
-            "1/user/-/activities/heart/date/{}/1d.json",
-            date
-        );
+        let path = format!("1/user/-/activities/heart/date/{}/1d.json", date);
         self.do_get(&path)
     }
 
     pub fn step(&self, date: &date::Date) -> Result<String> {
-        let path = format!(
-            "1/user/-/activities/steps/date/{}/1d.json",
-            date
-        );
+        let path = format!("1/user/-/activities/steps/date/{}/1d.json", date);
         self.do_get(&path)
     }
 
@@ -156,7 +149,10 @@ impl FitbitClient {
     }
 
     pub fn get_alarms(&self, user_id: &str, tracker_id: &str) -> Result<String> {
-        let path = format!("1/user/{}/devices/tracker/{}/alarms.json", user_id, tracker_id);
+        let path = format!(
+            "1/user/{}/devices/tracker/{}/alarms.json",
+            user_id, tracker_id
+        );
         self.do_get(&path)
     }
 
@@ -195,7 +191,8 @@ impl FitbitAuth {
         config = config.set_auth_type(AuthType::BasicAuth);
 
         // This example is requesting access to the user's public repos and email.
-        config = config.add_scope("activity")
+        config = config
+            .add_scope("activity")
             .add_scope("heartrate")
             .add_scope("location")
             .add_scope("nutrition")
@@ -236,13 +233,17 @@ impl FitbitAuth {
                     let &(ref key, _) = pair;
                     key == "code"
                 })
-                .ok_or(FitbitError::Other("query param `code` not found".to_string()))?;
-                // .ok_or("query param `code` not found")?;
+                .ok_or(FitbitError::Other(
+                    "query param `code` not found".to_string(),
+                ))?;
             value.to_string()
         };
 
         // Exchange the code with a token.
-        self.0.exchange_code(code).map(Token).map_err(convert::From::from)
+        self.0
+            .exchange_code(code)
+            .map(Token)
+            .map_err(convert::From::from)
     }
 
     pub fn exchange_refresh_token(&self, token: Token) -> Result<Token> {

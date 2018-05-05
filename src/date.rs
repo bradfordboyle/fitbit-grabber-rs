@@ -10,7 +10,9 @@ impl FromStr for Date {
     type Err = super::FitbitError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map(|d| Date(d)).map_err(From::from)
+        chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .map(|d| Date(d))
+            .map_err(From::from)
     }
 }
 
