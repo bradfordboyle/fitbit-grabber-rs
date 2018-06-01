@@ -1,30 +1,24 @@
 extern crate chrono;
-extern crate clap;
-extern crate oauth2;
 extern crate reqwest;
+extern crate oauth2;
+extern crate url;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
-extern crate serde_json;
 extern crate tiny_http;
-extern crate url;
 
-use std::env;
+
 use std::error::Error;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::Path;
 
-use chrono::NaiveDate;
-use clap::{App, Arg, SubCommand};
-use oauth2::{AuthType, Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
+use chrono::{NaiveDate, Utc};
+use oauth2::{AuthType, Config};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Token(oauth2::Token);
+pub struct Token(oauth2::Token);
 
-struct FitbitClient {
+pub struct FitbitClient {
     client: reqwest::Client,
     base: url::Url,
 }
@@ -82,12 +76,20 @@ impl FitbitClient {
             .and_then(|mut r| r.text())
             .map_err(stringify)
     }
+
+    pub fn weight(&self, date:NaiveDate) -> Result<String, String> {
+        let path = format!(
+            "user/-/body/weight/date/{}/1d.json",
+            date.format("%Y-%m-%d")
+        );
+        unimplemented!()
+    }
 }
 
-struct FitbitAuth(oauth2::Config);
+pub struct FitbitAuth(oauth2::Config);
 
 impl FitbitAuth {
-    fn new(client_id: &str, client_secret: &str) -> FitbitAuth {
+    pub fn new(client_id: &str, client_secret: &str) -> FitbitAuth {
         let auth_url = "https://www.fitbit.com/oauth2/authorize";
         let token_url = "https://api.fitbit.com/oauth2/token";
         // let token_url = "http://localhost:8080";
@@ -110,7 +112,7 @@ impl FitbitAuth {
         FitbitAuth(config)
     }
 
-    fn get_token(&self) -> Result<oauth2::Token, String> {
+    pub fn get_token(&self) -> Result<oauth2::Token, String> {
         let authorize_url = self.0.authorize_url();
 
         println!(
@@ -142,7 +144,7 @@ impl FitbitAuth {
         self.0.exchange_code(code).map_err(stringify)
     }
 
-    fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, String> {
+    pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, String> {
         match token.0.refresh_token {
             Some(t) => self.0.exchange_refresh_token(t).map_err(stringify),
             None => Err("No refresh token available".to_string()),
@@ -150,102 +152,10 @@ impl FitbitAuth {
     }
 }
 
-fn main() {
-    let matches = App::new("Fitbit Grabber")
-        .subcommand(
-            SubCommand::with_name("heart")
-                .about("fetch heart data")
-                .arg(
-                    Arg::with_name("date")
-                        .long("date")
-                        .required(true)
-                        .takes_value(true)
-                        .help("date to fetch data for"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("step").about("fetch step data").arg(
-                Arg::with_name("date")
-                    .long("date")
-                    .required(true)
-                    .takes_value(true)
-                    .help("date to fetch data for"),
-            ),
-        )
-        .subcommand(SubCommand::with_name("token").about("request an access token"))
-        .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
-        .subcommand(SubCommand::with_name("user").about("get user profile"))
-        .get_matches();
-
-    let fitbit_client_id =
-        env::var("FITBIT_CLIENT_ID").expect("Missing the FITBIT_CLIENT_ID environment variable.");
-    let fitbit_client_secret = env::var("FITBIT_CLIENT_SECRET")
-        .expect("Missing the FITBIT_CLIENT_SECRET environment variable.");
-    let auth = FitbitAuth::new(&fitbit_client_id, &fitbit_client_secret);
-
-    if let Some(_) = matches.subcommand_matches("token") {
-        auth.get_token()
-            .and_then(|token| save_token(".token", token))
-            .expect("unable to obtain token");
-    }
-
-    if let Some(_) = matches.subcommand_matches("refresh-token") {
-        load_token(".token")
-            .and_then(|token| auth.exchange_refresh_token(token))
-            .and_then(|token| save_token(".token", token))
-            .expect("unable to refresh token");
-    }
-
-    let token = load_token(".token").unwrap();
-    let f = FitbitClient::new(token);
-
-    if let Some(matches) = matches.subcommand_matches("heart") {
-        let heart_rate_data = matches
-            .value_of("date")
-            .ok_or("please give a starting date".to_string())
-            .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .and_then(|date| f.heart(date))
-            .expect("unable to fetch heart rate data for given date");
-        println!("{}", heart_rate_data);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("step") {
-        let step_data = matches
-            .value_of("date")
-            .ok_or("please give a starting date".to_string())
-            .and_then(|arg| NaiveDate::parse_from_str(&arg, "%Y-%m-%d").map_err(stringify))
-            .and_then(|date| f.step(date))
-            .expect("unable to fetch step data for given date");
-        println!("{}", step_data);
-    }
-
-    if let Some(_) = matches.subcommand_matches("user") {
-        let user_profile = f.user().expect("unable to fetch user profile");
-        println!("{}", user_profile);
-    }
-}
-
-fn save_token(filename: &str, token: oauth2::Token) -> Result<(), String> {
-    let json = serde_json::to_string(&token).unwrap();
-    let path = Path::new(filename);
-
-    File::create(&path)
-        .and_then(|mut file| file.write_all(json.as_bytes()))
-        .map_err(stringify)
-}
-
-fn load_token(filename: &str) -> Result<Token, String> {
-    let mut f = File::open(filename).expect("file not found");
-    let mut contents = String::new();
-    f.read_to_string(&mut contents)
-        .expect("unable to read file");
-
-    serde_json::from_str::<Token>(contents.trim()).map_err(stringify)
-}
-
 fn stringify<E: Error>(e: E) -> String {
     format!("{}", e)
 }
+
 
 #[cfg(test)]
 mod tests {

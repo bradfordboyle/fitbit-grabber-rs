@@ -4,6 +4,13 @@ version = "0.1.0"
 authors = ["Bradford D. Boyle <bradford.d.boyle@gmail.com>"]
 license = "Apache-2.0"
 
+[[bin]]
+name = "fitbit-grabber"
+path = "src/bin/main.rs"
+
+[lib]
+name = "fitbit"
+
 [dependencies]
 clap = "2.31"
 chrono = "0.4"
