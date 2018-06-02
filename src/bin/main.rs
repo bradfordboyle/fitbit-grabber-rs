@@ -19,6 +19,9 @@ use failure::Error;
 use chrono::NaiveDate;
 use clap::{App, Arg, SubCommand};
 
+mod config;
+use config::Config;
+
 fn main() -> Result<(), Error>{
     let matches = App::new("Fitbit Grabber")
         .subcommand(

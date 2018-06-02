@@ -3,6 +3,7 @@ name = "fitbit-grabber"
 version = "0.1.0"
 authors = ["Bradford D. Boyle <bradford.d.boyle@gmail.com>"]
 license = "Apache-2.0"
+autobins = false
 
 [[bin]]
 name = "fitbit-grabber"
