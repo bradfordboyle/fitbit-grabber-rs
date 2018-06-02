@@ -71,7 +71,7 @@ fn main() -> Result<(), Error>{
         let raw_date = matches
             .value_of("date")
             .ok_or(format_err!("please give a starting date"))?;
-        let date = NaiveDate::parse_from_str(&raw_date, "%Y-%m-%d").expect("date parse error");
+        let date = NaiveDate::parse_from_str(&raw_date, "%Y-%m-%d")?;
         let heart_rate_data = f.heart(date)?;
         println!("{}", heart_rate_data);
     }
