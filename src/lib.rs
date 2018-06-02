@@ -6,15 +6,16 @@ extern crate url;
 extern crate serde_derive;
 extern crate serde;
 extern crate tiny_http;
-
-
-use std::error::Error;
+#[macro_use]
+extern crate failure;
 
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate};
 use oauth2::{AuthType, Config};
 
+pub mod errors;
+use errors::Error;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Token(oauth2::Token);
 
@@ -24,7 +25,7 @@ pub struct FitbitClient {
 }
 
 impl FitbitClient {
-    pub fn new(token: Token) -> FitbitClient {
+    pub fn new(token: Token) -> Result<FitbitClient, Error> {
         let mut headers = Headers::new();
         headers.set(Authorization(Bearer {
             token: token.0.access_token,
@@ -34,50 +35,50 @@ impl FitbitClient {
         let client = reqwest::Client::builder()
             .default_headers(headers)
             .build()
-            .expect("Unable to build HTTP client");
+            .map_err(|e| Error::Http(e))?;
 
-        FitbitClient {
+        Ok(FitbitClient {
             client: client,
             base: url::Url::parse("https://api.fitbit.com/1/").unwrap(),
-        }
+        })
     }
 
-    pub fn user(&self) -> Result<String, String> {
-        let url = self.base.join("user/-/profile.json").map_err(stringify)?;
-        self.client
+    pub fn user(&self) -> Result<String, Error> {
+        let url = self.base.join("user/-/profile.json").map_err(|e| Error::Url(e))?;
+        Ok(self.client
             .request(reqwest::Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
-            .map_err(stringify)
+            .map_err(|e| Error::Http(e))?)
     }
 
-    pub fn heart(&self, date: NaiveDate) -> Result<String, String> {
+    pub fn heart(&self, date: NaiveDate) -> Result<String, Error> {
         let path = format!(
             "user/-/activities/heart/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
-        let url = self.base.join(&path).map_err(stringify)?;
+        let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
         self.client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
-            .map_err(stringify)
+            .map_err(|e| Error::Http(e))
     }
 
-    pub fn step(&self, date: NaiveDate) -> Result<String, String> {
+    pub fn step(&self, date: NaiveDate) -> Result<String, Error> {
         let path = format!(
             "user/-/activities/steps/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
-        let url = self.base.join(&path).map_err(stringify)?;
-        self.client
+        let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
+        Ok(self.client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
-            .map_err(stringify)
+            .map_err(|e| Error::Http(e))?)
     }
 
-    pub fn weight(&self, date:NaiveDate) -> Result<String, String> {
+    pub fn weight(&self, date:NaiveDate) -> Result<String, Error> {
         let path = format!(
             "user/-/body/weight/date/{}/1d.json",
             date.format("%Y-%m-%d")
@@ -112,7 +113,7 @@ impl FitbitAuth {
         FitbitAuth(config)
     }
 
-    pub fn get_token(&self) -> Result<oauth2::Token, String> {
+    pub fn get_token(&self) -> Result<oauth2::Token, Error> {
         let authorize_url = self.0.authorize_url();
 
         println!(
@@ -122,10 +123,10 @@ impl FitbitAuth {
 
         // FIXME avoid unwrap here
         let server = tiny_http::Server::http("localhost:8080").unwrap();
-        let request = server.recv().map_err(stringify)?;
+        let request = server.recv().map_err(|e| Error::Io(e))?;
         let url = request.url().to_string();
         let response = tiny_http::Response::from_string("Go back to your terminal :)");
-        request.respond(response).map_err(stringify)?;
+        request.respond(response).map_err(|e| Error::Io(e))?;
 
         let code = {
             // remove leading '/?'
@@ -136,25 +137,22 @@ impl FitbitAuth {
                     let &(ref key, _) = pair;
                     key == "code"
                 })
-                .ok_or("query param `code` not found")?;
+                .ok_or(Error::OAuthCodeMissing)?;
             value.to_string()
         };
 
         // Exchange the code with a token.
-        self.0.exchange_code(code).map_err(stringify)
+        self.0.exchange_code(code).map_err(|e| Error::AuthToken(e))
     }
 
-    pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, String> {
+    pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, Error> {
         match token.0.refresh_token {
-            Some(t) => self.0.exchange_refresh_token(t).map_err(stringify),
-            None => Err("No refresh token available".to_string()),
+            Some(t) => self.0.exchange_refresh_token(t).map_err(|e| Error::AuthToken(e)),
+            None => Err(Error::RefreshTokenMissing),
         }
     }
 }
 
-fn stringify<E: Error>(e: E) -> String {
-    format!("{}", e)
-}
 
 
 #[cfg(test)]
