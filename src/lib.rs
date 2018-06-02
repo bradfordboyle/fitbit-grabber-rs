@@ -12,10 +12,11 @@ extern crate failure;
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
 use chrono::{NaiveDate};
-use oauth2::{AuthType, Config};
+use oauth2::{AuthType, Config as OAuth2Config};
 
 pub mod errors;
 use errors::Error;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Token(oauth2::Token);
 
@@ -87,7 +88,7 @@ impl FitbitClient {
     }
 }
 
-pub struct FitbitAuth(oauth2::Config);
+pub struct FitbitAuth(OAuth2Config);
 
 impl FitbitAuth {
     pub fn new(client_id: &str, client_secret: &str) -> FitbitAuth {
@@ -96,7 +97,7 @@ impl FitbitAuth {
         // let token_url = "http://localhost:8080";
 
         // Set up the config for the Github OAuth2 process.
-        let mut config = Config::new(client_id, client_secret, auth_url, token_url);
+        let mut config = OAuth2Config::new(client_id, client_secret, auth_url, token_url);
 
         // config = config.set_response_type(ResponseType::Token);
         config = config.set_auth_type(AuthType::BasicAuth);
@@ -157,6 +158,7 @@ impl FitbitAuth {
 
 #[cfg(test)]
 mod tests {
+    // NOTE: where's this from? Tests don't compile.
     use DateRange;
 
     use chrono::{NaiveDate, Utc};
