@@ -1,6 +1,6 @@
 extern crate chrono;
-extern crate reqwest;
 extern crate oauth2;
+extern crate reqwest;
 extern crate url;
 #[macro_use]
 extern crate serde_derive;
@@ -9,10 +9,10 @@ extern crate tiny_http;
 #[macro_use]
 extern crate failure;
 
+use chrono::NaiveDate;
+use oauth2::{AuthType, Config as OAuth2Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
-use chrono::{NaiveDate};
-use oauth2::{AuthType, Config as OAuth2Config};
 
 pub mod errors;
 use errors::Error;
@@ -45,8 +45,12 @@ impl FitbitClient {
     }
 
     pub fn user(&self) -> Result<String, Error> {
-        let url = self.base.join("user/-/profile.json").map_err(|e| Error::Url(e))?;
-        Ok(self.client
+        let url = self
+            .base
+            .join("user/-/profile.json")
+            .map_err(|e| Error::Url(e))?;
+        Ok(self
+            .client
             .request(reqwest::Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
@@ -72,14 +76,15 @@ impl FitbitClient {
             date.format("%Y-%m-%d")
         );
         let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
-        Ok(self.client
+        Ok(self
+            .client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
             .map_err(|e| Error::Http(e))?)
     }
 
-    pub fn weight(&self, date:NaiveDate) -> Result<String, Error> {
+    pub fn weight(&self, date: NaiveDate) -> Result<String, Error> {
         let path = format!(
             "user/-/body/weight/date/{}/1d.json",
             date.format("%Y-%m-%d")
@@ -148,13 +153,14 @@ impl FitbitAuth {
 
     pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, Error> {
         match token.0.refresh_token {
-            Some(t) => self.0.exchange_refresh_token(t).map_err(|e| Error::AuthToken(e)),
+            Some(t) => self
+                .0
+                .exchange_refresh_token(t)
+                .map_err(|e| Error::AuthToken(e)),
             None => Err(Error::RefreshTokenMissing),
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

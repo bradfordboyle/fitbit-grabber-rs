@@ -1,20 +1,24 @@
 extern crate chrono;
 extern crate clap;
+extern crate fitbit;
 extern crate oauth2;
 extern crate reqwest;
-extern crate serde;
 extern crate serde_json;
 extern crate tiny_http;
+extern crate toml;
 extern crate url;
-extern crate fitbit;
 #[macro_use]
 extern crate failure;
 
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
+use failure::Error;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use failure::Error;
 
 use chrono::NaiveDate;
 use clap::{App, Arg, SubCommand};
@@ -22,8 +26,18 @@ use clap::{App, Arg, SubCommand};
 mod config;
 use config::Config;
 
-fn main() -> Result<(), Error>{
+fn main() -> Result<(), Error> {
+    //    let home_dir = ;
+    let default_config = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber/conf.toml");
+
     let matches = App::new("Fitbit Grabber")
+        .arg(
+            Arg::with_name("config")
+            .help("path to config file")
+            .short("c")
+            .long("config")
+            .default_value(default_config.to_str().unwrap())
+            )
         .subcommand(
             SubCommand::with_name("heart")
                 .about("fetch heart data")
@@ -50,11 +64,13 @@ fn main() -> Result<(), Error>{
         .subcommand(SubCommand::with_name("user").about("get user profile"))
         .get_matches();
 
-    let fitbit_client_id =
-        env::var("FITBIT_CLIENT_ID").expect("Missing the FITBIT_CLIENT_ID environment variable.");
-    let fitbit_client_secret = env::var("FITBIT_CLIENT_SECRET")
-        .expect("Missing the FITBIT_CLIENT_SECRET environment variable.");
-    let auth = fitbit::FitbitAuth::new(&fitbit_client_id, &fitbit_client_secret);
+    let conf = Config::load(matches.value_of("config"))?;
+    let config::FitbitConfig {
+        client_id,
+        client_secret,
+    } = conf.fitbit.unwrap();
+
+    let auth = fitbit::FitbitAuth::new(&client_id.unwrap(), &client_secret.unwrap());
 
     if let Some(_) = matches.subcommand_matches("token") {
         let token = auth.get_token()?;
@@ -101,8 +117,7 @@ fn save_token(filename: &str, token: oauth2::Token) -> Result<(), Error> {
     let json = serde_json::to_string(&token).unwrap();
     let path = Path::new(filename);
 
-    Ok(File::create(&path)
-        .and_then(|mut file| file.write_all(json.as_bytes()))?)
+    Ok(File::create(&path).and_then(|mut file| file.write_all(json.as_bytes()))?)
 }
 
 fn load_token(filename: &str) -> Result<fitbit::Token, Error> {
@@ -113,5 +128,3 @@ fn load_token(filename: &str) -> Result<fitbit::Token, Error> {
 
     Ok(serde_json::from_str::<fitbit::Token>(contents.trim())?)
 }
-
-

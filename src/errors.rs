@@ -1,7 +1,7 @@
 #[derive(Fail, Debug)]
 pub enum Error {
     #[fail(display = "http err: {}", _0)]
-    Http(#[cause]::reqwest::Error),
+    Http(#[cause] ::reqwest::Error),
 
     #[fail(display = "io error: {}", _0)]
     Io(#[cause] ::std::io::Error),
@@ -20,6 +20,4 @@ pub enum Error {
 
     #[fail(display = "bad date format: {}", _0)]
     DateParse(#[cause] ::chrono::ParseError),
-    
-
 }
