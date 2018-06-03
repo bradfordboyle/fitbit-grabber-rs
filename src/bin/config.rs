@@ -67,6 +67,7 @@ impl Config {
         Ok(conf)
     }
 
+    /// Deserialize a config from a toml file without applying environment variables.
     pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let mut f = File::open(path)?;
         let mut buffer = String::new();
