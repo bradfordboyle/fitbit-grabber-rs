@@ -30,3 +30,9 @@ impl From<reqwest::Error> for Error {
         Error::Http(kind)
     }
 }
+
+impl From<::std::io::Error> for Error {
+    fn from(kind: ::std::io::Error) -> Error {
+        Error::Io(kind)
+    }
+}
