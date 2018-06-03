@@ -158,17 +158,34 @@ impl FitbitAuth {
     pub fn get_token(&self) -> Result<oauth2::Token, Error> {
         let authorize_url = self.0.authorize_url();
 
+        use std::process::Command;
+
+        #[cfg(target_os = "linux")]
+        {
+            let mut cmd = Command::new("xdg-open");
+            cmd.arg(authorize_url.as_str());
+            let mut child = cmd.spawn()?;
+            child.wait()?;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let mut cmd = Command::new("open");
+            cmd.arg(authorize_url.as_str());
+            let mut child = cmd.spawn()?;
+            child.wait()?;
+        }
+
         println!(
-            "Open this URL in your browser:\n{}\n",
+            "Your browser should open automatically. If not, open this URL in your browser:\n{}\n",
             authorize_url.to_string()
         );
 
         // FIXME avoid unwrap here
-        let server = tiny_http::Server::http("localhost:8080").unwrap();
-        let request = server.recv().map_err(|e| Error::Io(e))?;
+        let server = tiny_http::Server::http("localhost:8080").expect("could not start http listener");
+        let request = server.recv()?;
         let url = request.url().to_string();
         let response = tiny_http::Response::from_string("Go back to your terminal :)");
-        request.respond(response).map_err(|e| Error::Io(e))?;
+        request.respond(response)?;
 
         let code = {
             // remove leading '/?'
