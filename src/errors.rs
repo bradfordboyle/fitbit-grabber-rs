@@ -1,3 +1,6 @@
+use reqwest;
+use std::convert::From;
+
 #[derive(Fail, Debug)]
 pub enum Error {
     #[fail(display = "http err: {}", _0)]
@@ -20,4 +23,10 @@ pub enum Error {
 
     #[fail(display = "bad date format: {}", _0)]
     DateParse(#[cause] ::chrono::ParseError),
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(kind: reqwest::Error) -> Error {
+        Error::Http(kind)
+    }
 }

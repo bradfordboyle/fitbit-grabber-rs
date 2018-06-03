@@ -63,7 +63,6 @@ impl Config {
         if conf.fitbit.is_none() {
             conf.fitbit = Some(temp);
         }
-        println!("config! {:?}", conf);
         Ok(conf)
     }
 

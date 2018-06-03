@@ -84,13 +84,37 @@ impl FitbitClient {
             .map_err(|e| Error::Http(e))?)
     }
 
-    pub fn weight(&self, date: NaiveDate) -> Result<String, Error> {
-        let path = format!(
+    pub fn weight(&self, date: NaiveDate) -> Result<Vec<Weight>, Error> {
+        let url = format!(
             "user/-/body/weight/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
-        unimplemented!()
+        Ok(self
+            .client
+            .request(Method::Get, &url)
+            .send()
+            .and_then(|mut resp| Ok(resp.json::<Vec<Weight>>()?))?)
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Weight {
+    pub bmi: f32,
+    pub date: String,
+    pub log_id: i32,
+    pub time: String,
+    pub weight: f32,
+    pub source: String,
+    /*
+     * {
+     *    "bmi":23.57,
+     *    "date":"2015-03-05",
+     *    "logId":1330991999000,
+     *    "time":"23:59:59",
+     *    "weight":73,
+     *    "source": "API"
+     *  }
+     */
 }
 
 pub struct FitbitAuth(OAuth2Config);

@@ -15,6 +15,7 @@ extern crate serde;
 extern crate serde_derive;
 
 use failure::Error;
+
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -84,7 +85,7 @@ fn main() -> Result<(), Error> {
     }
 
     let token = load_token(".token").unwrap();
-    let f = fitbit::FitbitClient::new(token).unwrap();
+    let f = fitbit::FitbitClient::new(token)?;
 
     if let Some(matches) = matches.subcommand_matches("heart") {
         let raw_date = matches
