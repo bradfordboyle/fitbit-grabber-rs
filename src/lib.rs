@@ -84,26 +84,37 @@ impl FitbitClient {
             .map_err(|e| Error::Http(e))?)
     }
 
-    pub fn weight(&self, date: NaiveDate) -> Result<Vec<Weight>, Error> {
-        let url = format!(
-            "user/-/body/weight/date/{}/1d.json",
+    pub fn weight(&self, date: NaiveDate) -> Result<WeightResult, Error> {
+        let path = format!(
+            "user/-/body/log/weight/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
+        let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
         Ok(self
             .client
-            .request(Method::Get, &url)
+            .request(Method::Get, url)
             .send()
-            .and_then(|mut resp| Ok(resp.json::<Vec<Weight>>()?))?)
+            .and_then(|mut resp| {
+                //println!("debuggin': {:?}", resp);
+                Ok(resp.json::<WeightResult>()?)
+            })?)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WeightResult {
+    pub weight: Vec<Weight>,
+}
+
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Weight {
-    pub bmi: f32,
+    pub bmi: f64,
     pub date: String,
-    pub log_id: i32,
+    #[serde(rename = "logId")]
+    pub log_id: i64,
     pub time: String,
-    pub weight: f32,
+    pub weight: f64,
     pub source: String,
     /*
      * {
@@ -135,6 +146,7 @@ impl FitbitAuth {
         config = config.add_scope("activity");
         config = config.add_scope("heartrate");
         config = config.add_scope("profile");
+        config = config.add_scope("weight");
 
         // This example will be running its own server at localhost:8080.
         // See below for the server implementation.

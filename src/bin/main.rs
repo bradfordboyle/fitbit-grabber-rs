@@ -30,36 +30,35 @@ use config::Config;
 fn main() -> Result<(), Error> {
     //    let home_dir = ;
     let default_config = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber/conf.toml");
+    let date_arg = Arg::with_name("date")
+        .long("date")
+        .required(true)
+        .takes_value(true)
+        .help("date to fetch data for");
 
     let matches = App::new("Fitbit Grabber")
         .arg(
             Arg::with_name("config")
-            .help("path to config file")
-            .short("c")
-            .long("config")
-            .default_value(default_config.to_str().unwrap())
-            )
+                .help("path to config file")
+                .short("c")
+                .long("config")
+                .default_value(default_config.to_str().unwrap()),
+        )
         .subcommand(
             SubCommand::with_name("heart")
                 .about("fetch heart data")
-                .arg(
-                    Arg::with_name("date")
-                        .long("date")
-                        .required(true)
-                        .takes_value(true)
-                        .help("date to fetch data for"),
-                ),
+                .arg(date_arg.clone()),
         )
         .subcommand(
-            SubCommand::with_name("step").about("fetch step data").arg(
-                Arg::with_name("date")
-                    .long("date")
-                    .required(true)
-                    .takes_value(true)
-                    .help("date to fetch data for"),
-            ),
+            SubCommand::with_name("step")
+                .about("fetch step data")
+                .arg(date_arg.clone()),
         )
-        // TODO body weight command
+        .subcommand(
+            SubCommand::with_name("weight")
+                .about("fetch body weight data")
+                .arg(date_arg.clone()),
+        )
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
         .subcommand(SubCommand::with_name("user").about("get user profile"))
@@ -109,6 +108,20 @@ fn main() -> Result<(), Error> {
     if let Some(_) = matches.subcommand_matches("user") {
         let user_profile = f.user()?;
         println!("{}", user_profile);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("weight") {
+        let raw_date = matches
+            .value_of("date")
+            .ok_or(format_err!("please give a starting date"))?;
+        let date = NaiveDate::parse_from_str(&raw_date, "%Y-%m-%d")
+            .map_err(|e| format_err!("could not parse date {}", e))?;
+        let results = f.weight(date)?;
+        let data = results.weight;
+        for result in data {
+            println!("{:?}", result);
+        }
+
     }
 
     Ok(()) // ok!
