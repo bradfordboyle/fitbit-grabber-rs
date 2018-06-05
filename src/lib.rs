@@ -9,8 +9,6 @@ extern crate tiny_http;
 #[macro_use]
 extern crate failure;
 
-use std::collections::HashMap;
-
 use chrono::NaiveDate;
 use oauth2::{AuthType, Config as OAuth2Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
@@ -40,25 +38,29 @@ pub enum DateQuery {
     Range(NaiveDate, NaiveDate),
 }
 
+
 impl Body for FitbitClient {
     fn get_body_time_series(&self, q: DateQuery) -> Result<WeightSeriesResult, Error> {
-        let url = match q {
-            DateQuery::PeriodicSince(date, period) => {
-                let path = format!(
-                    "user/-/body/weight/date/{}/{}.json",
-                    date.format("%Y-%m-%d"),
-                    period.string()
-                );
-                self.base.join(&path)
-            }
+        let url: String = match q {
+            DateQuery::PeriodicSince(date, period) => format!(
+                "user/-/body/weight/date/{}/{}.json",
+                date.format("%Y-%m-%d"),
+                period.string()
+            ),
+            //GET /1/user/[user-id]/body/[resource-path]/date/[base-date]/[end-date].json
+            DateQuery::Range(from, to) => format!(
+                "user/-/body/weight/date/{}/{}.json",
+                from.format("%Y-%m-%d"),
+                to.format("%Y-%m-%d")
+            ),
             _ => unimplemented!(),
-        }?;
+        };
         Ok(self
             .client
-            .request(Method::Get, url)
+            .request(Method::Get, self.base.join(&url)?)
             .send()
             .and_then(|mut resp| {
-                println!("debuggin': {:?}", resp);
+                //println!("debuggin': {:?}", resp);
                 Ok(resp.json::<WeightSeriesResult>()?)
             })?)
     }
@@ -92,8 +94,7 @@ impl FitbitClient {
             .client
             .request(reqwest::Method::Get, url)
             .send()
-            .and_then(|mut r| r.text())
-            .map_err(|e| Error::Http(e))?)
+            .and_then(|mut r| r.text())?)
     }
 
     pub fn heart(&self, date: NaiveDate) -> Result<String, Error> {
