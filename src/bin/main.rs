@@ -21,7 +21,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, DateTime};
 use clap::{App, Arg, SubCommand};
 
 mod config;
@@ -29,8 +29,9 @@ use config::Config;
 use fitbit::{Body, DateQuery, Period};
 
 fn main() -> Result<(), Error> {
-    //    let home_dir = ;
-    let default_config = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber/conf.toml");
+    let default_dir = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber");
+    let default_dir_clone = default_dir.clone();
+    let default_config = default_dir.clone().join("conf.toml");
     let date_arg = Arg::with_name("date")
         .long("date")
         .required(true)
@@ -44,6 +45,13 @@ fn main() -> Result<(), Error> {
                 .short("c")
                 .long("config")
                 .default_value(default_config.to_str().unwrap()),
+        )
+        .arg(
+            Arg::with_name("data-dir")
+            .help("path to data directory for cached data and auth token; a database sub-directory will be created here")
+            .short("d")
+            .long("data-dir")
+            .default_value(default_dir_clone.to_str().unwrap())
         )
         .subcommand(
             SubCommand::with_name("heart")
@@ -134,7 +142,9 @@ fn main() -> Result<(), Error> {
         let results = f.get_body_time_series(q)?;
         //let data = results.weight;
         //for result in data {
-        println!("{:?}", results);
+        let data = results.body_weight;
+        
+        println!("{:?}", data);
         //}
     }
 

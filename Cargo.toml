@@ -21,6 +21,7 @@ sled = "*"
 tiny_http = "0.6"
 toml = "*"
 url = "1.7"
+keyz = { "git" = "https://github.com/anxiousmodernman/keyz", "branch" = "master" }
 
 [lib]
 name = "fitbit"

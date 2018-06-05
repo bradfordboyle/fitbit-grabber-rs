@@ -27,17 +27,16 @@ pub struct FitbitClient {
 
 type WeightResult2 = String; //HashMap<String, Vec<HashMap<String, String>>>;
 
-pub trait Body {
-    fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
-    // TODO many more
-}
-
 pub enum DateQuery {
     ForDate(NaiveDate),
     PeriodicSince(NaiveDate, Period),
     Range(NaiveDate, NaiveDate),
 }
 
+pub trait Body {
+    fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
+    // etc.
+}
 
 impl Body for FitbitClient {
     fn get_body_time_series(&self, q: DateQuery) -> Result<WeightSeriesResult, Error> {
@@ -166,7 +165,7 @@ pub struct WeightSeries {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WeightSeriesResult {
     #[serde(rename = "body-weight")]
-    body_weight: Vec<WeightSeries>,
+    pub body_weight: Vec<WeightSeries>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
