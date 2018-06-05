@@ -15,6 +15,7 @@ use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
 
 pub mod errors;
+
 use errors::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,12 +26,42 @@ pub struct FitbitClient {
     base: url::Url,
 }
 
-type WeightResult2 = String; //HashMap<String, Vec<HashMap<String, String>>>;
-
 pub enum DateQuery {
     ForDate(NaiveDate),
     PeriodicSince(NaiveDate, Period),
     Range(NaiveDate, NaiveDate),
+}
+
+/// UserProfile is a partial serialization struct of the Fitbit API profile. See:
+/// https://dev.fitbit.com/build/reference/web-api/user/
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserProfile {
+    age: i64,
+    #[serde(rename = "offsetFromUTCMillis")]
+    utc_offset: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserProfileResult {
+    user: UserProfile,
+}
+
+pub trait User {
+    fn get_profile(&self) -> Result<UserProfileResult, Error>;
+}
+
+impl User for FitbitClient {
+    fn get_profile(&self) -> Result<UserProfileResult, Error> {
+        let url = self.base.join("user/-/profile.json")?;
+        Ok(self
+            .client
+            .request(Method::Get, url)
+            .send()
+            .and_then(|mut resp| {
+                //println!("debuggin': {:?}", resp);
+                Ok(resp.json::<UserProfileResult>()?)
+            })?)
+    }
 }
 
 pub trait Body {
@@ -154,7 +185,6 @@ impl Period {
         }
     }
 }
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WeightSeries {
     #[serde(rename = "dateTime")]

@@ -4,6 +4,7 @@ extern crate fitbit;
 extern crate oauth2;
 extern crate reqwest;
 extern crate serde_json;
+extern crate sled;
 extern crate tiny_http;
 extern crate toml;
 extern crate url;
@@ -21,12 +22,13 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use chrono::{NaiveDate, DateTime};
+use chrono::{DateTime, NaiveDate};
 use clap::{App, Arg, SubCommand};
+use sled::{ConfigBuilder, Tree};
 
 mod config;
 use config::Config;
-use fitbit::{Body, DateQuery, Period};
+use fitbit::{Body, DateQuery, Period, User};
 
 fn main() -> Result<(), Error> {
     let default_dir = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber");
@@ -73,6 +75,9 @@ fn main() -> Result<(), Error> {
         .subcommand(SubCommand::with_name("user").about("get user profile"))
         .get_matches();
 
+    // open database
+    let db = open_db(matches.value_of("data-dir").unwrap())?;
+
     let conf = Config::load(matches.value_of("config"))?;
     let config::FitbitConfig {
         client_id,
@@ -115,8 +120,8 @@ fn main() -> Result<(), Error> {
     }
 
     if let Some(_) = matches.subcommand_matches("user") {
-        let user_profile = f.user()?;
-        println!("{}", user_profile);
+        let user_profile = f.get_profile()?;
+        println!("{:?}", user_profile);
     }
 
     //if let Some(matches) = matches.subcommand_matches("weight") {
@@ -140,12 +145,12 @@ fn main() -> Result<(), Error> {
             .map_err(|e| format_err!("could not parse date {}", e))?;
         let q = DateQuery::PeriodicSince(date, Period::Week);
         let results = f.get_body_time_series(q)?;
-        //let data = results.weight;
-        //for result in data {
         let data = results.body_weight;
-        
-        println!("{:?}", data);
-        //}
+        for result in data {
+            // make key
+            println!("{:?}", result);
+            // save to db
+        }
     }
 
     Ok(()) // ok!
@@ -159,10 +164,19 @@ fn save_token(filename: &str, token: oauth2::Token) -> Result<(), Error> {
 }
 
 fn load_token(filename: &str) -> Result<fitbit::Token, Error> {
-    let mut f = File::open(filename).expect("file not found");
+    let mut f = File::open(filename)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)
         .expect("unable to read file");
 
     Ok(serde_json::from_str::<fitbit::Token>(contents.trim())?)
+}
+
+fn open_db<P: AsRef<Path>>(conf: P) -> Result<sled::Tree, Error>
+where
+    P: std::convert::AsRef<std::ffi::OsStr>,
+{
+    let full_path = Path::new(&conf).join("data");
+    let db_conf = ConfigBuilder::new().path(full_path).build();
+    Tree::start(db_conf).map_err(|e| format_err!("could not open database {:?}", e))
 }
