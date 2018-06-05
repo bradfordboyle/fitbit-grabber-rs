@@ -26,6 +26,7 @@ use clap::{App, Arg, SubCommand};
 
 mod config;
 use config::Config;
+use fitbit::{Body, DateQuery, Period};
 
 fn main() -> Result<(), Error> {
     //    let home_dir = ;
@@ -110,18 +111,31 @@ fn main() -> Result<(), Error> {
         println!("{}", user_profile);
     }
 
+    //if let Some(matches) = matches.subcommand_matches("weight") {
+    //    let raw_date = matches
+    //        .value_of("date")
+    //        .ok_or(format_err!("please give a starting date"))?;
+    //    let date = NaiveDate::parse_from_str(&raw_date, "%Y-%m-%d")
+    //        .map_err(|e| format_err!("could not parse date {}", e))?;
+    //    let results = f.weight(date)?;
+    //    let data = results.weight;
+    //    for result in data {
+    //        println!("{:?}", result);
+    //    }
+    //}
+
     if let Some(matches) = matches.subcommand_matches("weight") {
         let raw_date = matches
             .value_of("date")
             .ok_or(format_err!("please give a starting date"))?;
         let date = NaiveDate::parse_from_str(&raw_date, "%Y-%m-%d")
             .map_err(|e| format_err!("could not parse date {}", e))?;
-        let results = f.weight(date)?;
-        let data = results.weight;
-        for result in data {
-            println!("{:?}", result);
-        }
-
+        let q = DateQuery::PeriodicSince(date, Period::Week);
+        let results = f.get_body_time_series(q)?;
+        //let data = results.weight;
+        //for result in data {
+        println!("{:?}", results);
+        //}
     }
 
     Ok(()) // ok!

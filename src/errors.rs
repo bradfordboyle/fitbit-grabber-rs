@@ -1,5 +1,6 @@
 use reqwest;
 use std::convert::From;
+use url;
 
 #[derive(Fail, Debug)]
 pub enum Error {
@@ -34,5 +35,11 @@ impl From<reqwest::Error> for Error {
 impl From<::std::io::Error> for Error {
     fn from(kind: ::std::io::Error) -> Error {
         Error::Io(kind)
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(kind: url::ParseError) -> Error {
+        Error::Url(kind)
     }
 }

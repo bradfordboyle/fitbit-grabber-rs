@@ -9,6 +9,8 @@ extern crate tiny_http;
 #[macro_use]
 extern crate failure;
 
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use oauth2::{AuthType, Config as OAuth2Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
@@ -23,6 +25,43 @@ pub struct Token(oauth2::Token);
 pub struct FitbitClient {
     client: reqwest::Client,
     base: url::Url,
+}
+
+type WeightResult2 = String; //HashMap<String, Vec<HashMap<String, String>>>;
+
+pub trait Body {
+    fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
+    // TODO many more
+}
+
+pub enum DateQuery {
+    ForDate(NaiveDate),
+    PeriodicSince(NaiveDate, Period),
+    Range(NaiveDate, NaiveDate),
+}
+
+impl Body for FitbitClient {
+    fn get_body_time_series(&self, q: DateQuery) -> Result<WeightSeriesResult, Error> {
+        let url = match q {
+            DateQuery::PeriodicSince(date, period) => {
+                let path = format!(
+                    "user/-/body/weight/date/{}/{}.json",
+                    date.format("%Y-%m-%d"),
+                    period.string()
+                );
+                self.base.join(&path)
+            }
+            _ => unimplemented!(),
+        }?;
+        Ok(self
+            .client
+            .request(Method::Get, url)
+            .send()
+            .and_then(|mut resp| {
+                println!("debuggin': {:?}", resp);
+                Ok(resp.json::<WeightSeriesResult>()?)
+            })?)
+    }
 }
 
 impl FitbitClient {
@@ -101,11 +140,38 @@ impl FitbitClient {
     }
 }
 
+/// Variants are 1d, 7d, 30d, 1w, 1m, 3m, 6m, 1y, or max.
+pub enum Period {
+    Day,
+    Week,
+}
+
+impl Period {
+    pub fn string(&self) -> &'static str {
+        match *self {
+            Period::Day => "1d",
+            Period::Week => "1w",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WeightSeries {
+    #[serde(rename = "dateTime")]
+    pub date: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WeightSeriesResult {
+    #[serde(rename = "body-weight")]
+    body_weight: Vec<WeightSeries>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WeightResult {
     pub weight: Vec<Weight>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Weight {
@@ -167,6 +233,7 @@ impl FitbitAuth {
             let mut child = cmd.spawn()?;
             child.wait()?;
         }
+
         #[cfg(target_os = "macos")]
         {
             let mut cmd = Command::new("open");
@@ -181,7 +248,8 @@ impl FitbitAuth {
         );
 
         // FIXME avoid unwrap here
-        let server = tiny_http::Server::http("localhost:8080").expect("could not start http listener");
+        let server =
+            tiny_http::Server::http("localhost:8080").expect("could not start http listener");
         let request = server.recv()?;
         let url = request.url().to_string();
         let response = tiny_http::Response::from_string("Go back to your terminal :)");
