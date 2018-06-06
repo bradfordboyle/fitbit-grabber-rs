@@ -107,8 +107,8 @@ fn main() -> Result<(), Error> {
     }
 
     if let Some(_) = matches.subcommand_matches("user") {
-        let user_profile = f.get_profile()?;
-        println!("{:?}", user_profile);
+        let profile = f.get_user_profile()?;
+        println!("{:?}", profile);
     }
 
     Ok(()) // ok!

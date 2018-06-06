@@ -48,11 +48,11 @@ pub struct UserProfileResult {
 }
 
 pub trait User {
-    fn get_profile(&self) -> Result<UserProfileResult, Error>;
+    fn get_user_profile(&self) -> Result<UserProfileResult, Error>;
 }
 
 impl User for FitbitClient {
-    fn get_profile(&self) -> Result<UserProfileResult, Error> {
+    fn get_user_profile(&self) -> Result<UserProfileResult, Error> {
         let url = self.base.join("user/-/profile.json")?;
         Ok(self.client.get(url).send()?.json()?)
     }
