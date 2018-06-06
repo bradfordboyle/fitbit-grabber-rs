@@ -2,7 +2,7 @@
 authors = ["Bradford D. Boyle <bradford.d.boyle@gmail.com>"]
 autobins = false
 license = "Apache-2.0"
-name = "fitbit-grabber"
+name = "fitbit"
 version = "0.1.0"
 
 [dependencies]
