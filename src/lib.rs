@@ -54,14 +54,7 @@ pub trait User {
 impl User for FitbitClient {
     fn get_profile(&self) -> Result<UserProfileResult, Error> {
         let url = self.base.join("user/-/profile.json")?;
-        Ok(self
-            .client
-            .request(Method::Get, url)
-            .send()
-            .and_then(|mut resp| {
-                //println!("debuggin': {:?}", resp);
-                Ok(resp.json::<UserProfileResult>()?)
-            })?)
+        Ok(self.client.get(url).send()?.json()?)
     }
 }
 
