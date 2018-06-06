@@ -129,5 +129,3 @@ fn load_token(filename: &str) -> Result<fitbit::Token, Error> {
 
     Ok(serde_json::from_str::<fitbit::Token>(contents.trim())?)
 }
-
-

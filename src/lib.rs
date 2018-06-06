@@ -84,16 +84,9 @@ impl Body for FitbitClient {
                 from.format("%Y-%m-%d"),
                 to.format("%Y-%m-%d")
             ),
-            _ => unimplemented!(),
+            _ => unimplemented!(), // TODO: missing an error type?
         };
-        Ok(self
-            .client
-            .request(Method::Get, self.base.join(&url)?)
-            .send()
-            .and_then(|mut resp| {
-                //println!("debuggin': {:?}", resp);
-                Ok(resp.json::<WeightSeriesResult>()?)
-            })?)
+        Ok(self.client.get(&url).send()?.json()?)
     }
 }
 
