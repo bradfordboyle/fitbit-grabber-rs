@@ -40,18 +40,16 @@ impl Config {
     pub fn load(path: Option<&str>) -> Result<Config, Error> {
         let mut conf = Config { fitbit: None };
 
-        // try config file
         match path {
-            // custom path to config file, passed as a flag
             Some(path) => {
-                //if let Some(found) = try_file(&PathBuf::from(Path::new(pathbuf))) {
+                // custom path to config file, passed as a flag
                 if let Ok(found) = Config::from_toml_file(path) {
                     conf = found;
                 }
             }
-            // default path
             None => {
-                let base_dir = env::var("HOME")?;
+                // default path
+                let base_dir = env::home_dir().ok_or(format_err!("HOME does not exist"))?;
                 let joined_path =
                     Path::join(Path::new(&base_dir), ".config/fitbit-grabber/conf.toml");
                 if let Ok(found) = Config::from_toml_file(joined_path) {
