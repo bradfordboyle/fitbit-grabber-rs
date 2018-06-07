@@ -9,7 +9,7 @@ supports:
 ## Building
 
 ```sh
-cargo build [--release]
+cargo build [--release] --bin fitbit-grabber
 ```
 
 ## Using
