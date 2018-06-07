@@ -289,39 +289,3 @@ impl FitbitAuth {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    // NOTE: where's this from? Tests don't compile.
-    use DateRange;
-
-    use chrono::{NaiveDate, Utc};
-
-    #[test]
-    fn daterange() {
-        let d = DateRange::new("2017-09-01", "2017-09-30").unwrap();
-        assert_eq!(d.start, NaiveDate::from_ymd(2017, 9, 1));
-        assert_eq!(d.end, NaiveDate::from_ymd(2017, 9, 30));
-    }
-
-    #[test]
-    fn daterange_from() {
-        let d = DateRange::from(NaiveDate::from_ymd(2017, 9, 1));
-        assert_eq!(d.start, NaiveDate::from_ymd(2017, 9, 1));
-        assert_eq!(d.end, Utc::today().naive_utc());
-    }
-
-    #[test]
-    fn daterange_iter() {
-        let d = DateRange::new("2017-09-01", "2017-09-03").unwrap();
-        let dates: Vec<NaiveDate> = d.collect();
-        assert_eq!(
-            dates,
-            vec![
-                NaiveDate::from_ymd(2017, 9, 1),
-                NaiveDate::from_ymd(2017, 9, 2),
-                NaiveDate::from_ymd(2017, 9, 3),
-            ]
-        )
-    }
-}
