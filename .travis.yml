@@ -1,0 +1,18 @@
+language: rust
+dist: trusty
+addons:
+  apt:
+    packages:
+      - libssl-dev
+
+cache: cargo
+rust:
+  - nightly
+  - beta
+  - stable
+
+
+script:
+  - cargo clean
+  - cargo build
+  - cargo test

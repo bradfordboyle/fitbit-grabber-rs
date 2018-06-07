@@ -1,6 +1,10 @@
 # fitbit-grabber
-This is a small utility for fetching data from the FitBit web API. It currently
-supports:
+
+This is a small utility for fetching data from the FitBit web API.
+
+[![Build Status](https://travis-ci.org/bradfordboyle/fitbit-grabber-rs.svg?branch=master)](https://travis-ci.org/bradfordboyle/fitbit-grabber-rs)
+
+It currently supports:
 
 - Heart Rate
 - Steps
