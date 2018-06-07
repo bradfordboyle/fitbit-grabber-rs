@@ -26,7 +26,7 @@ use clap::{App, Arg, SubCommand};
 
 mod config;
 use config::Config;
-use fitbit::User;
+use fitbit::user::User;
 
 fn main() -> Result<(), Error> {
     let default_dir = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber");

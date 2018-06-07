@@ -14,7 +14,11 @@ use oauth2::{AuthType, Config as OAuth2Config};
 use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
 
+// TODO: how to re-export public names?
+pub mod body;
 pub mod errors;
+pub mod query;
+pub mod user;
 
 use errors::Error;
 
@@ -24,63 +28,6 @@ pub struct Token(oauth2::Token);
 pub struct FitbitClient {
     client: reqwest::Client,
     base: url::Url,
-}
-
-pub enum DateQuery {
-    ForDate(NaiveDate),
-    PeriodicSince(NaiveDate, Period),
-    Range(NaiveDate, NaiveDate),
-}
-
-/// UserProfile is a partial serialization struct of the Fitbit API profile. See:
-/// https://dev.fitbit.com/build/reference/web-api/user/
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UserProfile {
-    age: i64,
-    #[serde(rename = "offsetFromUTCMillis")]
-    utc_offset: i64,
-    // TODO: lots of fields...
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UserProfileResult {
-    user: UserProfile,
-}
-
-pub trait User {
-    fn get_user_profile(&self) -> Result<UserProfileResult, Error>;
-}
-
-impl User for FitbitClient {
-    fn get_user_profile(&self) -> Result<UserProfileResult, Error> {
-        let url = self.base.join("user/-/profile.json")?;
-        Ok(self.client.get(url).send()?.json()?)
-    }
-}
-
-pub trait Body {
-    fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
-    // etc.
-}
-
-impl Body for FitbitClient {
-    fn get_body_time_series(&self, q: DateQuery) -> Result<WeightSeriesResult, Error> {
-        let url: String = match q {
-            DateQuery::PeriodicSince(date, period) => format!(
-                "user/-/body/weight/date/{}/{}.json",
-                date.format("%Y-%m-%d"),
-                period.string()
-            ),
-            //GET /1/user/[user-id]/body/[resource-path]/date/[base-date]/[end-date].json
-            DateQuery::Range(from, to) => format!(
-                "user/-/body/weight/date/{}/{}.json",
-                from.format("%Y-%m-%d"),
-                to.format("%Y-%m-%d")
-            ),
-            _ => unimplemented!(), // TODO: missing an error type?
-        };
-        Ok(self.client.get(&url).send()?.json()?)
-    }
 }
 
 impl FitbitClient {
@@ -140,65 +87,6 @@ impl FitbitClient {
             .and_then(|mut r| r.text())
             .map_err(|e| Error::Http(e))?)
     }
-
-    pub fn weight(&self, date: NaiveDate) -> Result<WeightResult, Error> {
-        let path = format!(
-            "user/-/body/log/weight/date/{}/1d.json",
-            date.format("%Y-%m-%d")
-        );
-        let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
-        Ok(self
-            .client
-            .request(Method::Get, url)
-            .send()
-            .and_then(|mut resp| {
-                //println!("debuggin': {:?}", resp);
-                Ok(resp.json::<WeightResult>()?)
-            })?)
-    }
-}
-
-/// Variants are 1d, 7d, 30d, 1w, 1m, 3m, 6m, 1y, or max.
-pub enum Period {
-    Day,
-    Week,
-}
-
-impl Period {
-    pub fn string(&self) -> &'static str {
-        match *self {
-            Period::Day => "1d",
-            Period::Week => "1w",
-        }
-    }
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct WeightSeries {
-    #[serde(rename = "dateTime")]
-    pub date: String,
-    pub value: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct WeightSeriesResult {
-    #[serde(rename = "body-weight")]
-    pub body_weight: Vec<WeightSeries>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct WeightResult {
-    pub weight: Vec<Weight>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Weight {
-    pub bmi: f64,
-    pub date: String,
-    #[serde(rename = "logId")]
-    pub log_id: i64,
-    pub time: String,
-    pub weight: f64,
-    pub source: String,
 }
 
 pub struct FitbitAuth(OAuth2Config);
