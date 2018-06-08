@@ -1,4 +1,6 @@
 extern crate chrono;
+#[macro_use]
+extern crate log;
 extern crate oauth2;
 extern crate reqwest;
 extern crate url;
@@ -15,12 +17,16 @@ use reqwest::header::{Authorization, Bearer, Headers, UserAgent};
 use reqwest::Method;
 
 // TODO: how to re-export public names?
+pub mod activities;
 pub mod body;
+pub mod date;
 pub mod errors;
 pub mod query;
 pub mod user;
 
 use errors::Error;
+
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Token(oauth2::Token);
@@ -31,7 +37,7 @@ pub struct FitbitClient {
 }
 
 impl FitbitClient {
-    pub fn new(token: Token) -> Result<FitbitClient, Error> {
+    pub fn new(token: Token) -> Result<FitbitClient> {
         let mut headers = Headers::new();
         headers.set(Authorization(Bearer {
             token: token.0.access_token,
@@ -49,19 +55,17 @@ impl FitbitClient {
         })
     }
 
-    pub fn user(&self) -> Result<String, Error> {
-        let url = self
-            .base
+    pub fn user(&self) -> Result<String> {
+        let url = self.base
             .join("user/-/profile.json")
             .map_err(|e| Error::Url(e))?;
-        Ok(self
-            .client
+        Ok(self.client
             .request(reqwest::Method::Get, url)
             .send()
             .and_then(|mut r| r.text())?)
     }
 
-    pub fn heart(&self, date: NaiveDate) -> Result<String, Error> {
+    pub fn heart(&self, date: NaiveDate) -> Result<String> {
         let path = format!(
             "user/-/activities/heart/date/{}/1d.json",
             date.format("%Y-%m-%d")
@@ -74,18 +78,23 @@ impl FitbitClient {
             .map_err(|e| Error::Http(e))
     }
 
-    pub fn step(&self, date: NaiveDate) -> Result<String, Error> {
+    pub fn step(&self, date: NaiveDate) -> Result<String> {
         let path = format!(
             "user/-/activities/steps/date/{}/1d.json",
             date.format("%Y-%m-%d")
         );
         let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
-        Ok(self
-            .client
+        Ok(self.client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
             .map_err(|e| Error::Http(e))?)
+    }
+
+    fn do_get(&self, path: &str) -> Result<String> {
+        let url = self.base.join(&path)?;
+        debug!("GET - {:?}", url);
+        Ok(self.client.get(url).send()?.text()?)
     }
 }
 
@@ -116,7 +125,7 @@ impl FitbitAuth {
         FitbitAuth(config)
     }
 
-    pub fn get_token(&self) -> Result<oauth2::Token, Error> {
+    pub fn get_token(&self) -> Result<oauth2::Token> {
         let authorize_url = self.0.authorize_url();
 
         use std::process::Command;
@@ -167,10 +176,9 @@ impl FitbitAuth {
         self.0.exchange_code(code).map_err(|e| Error::AuthToken(e))
     }
 
-    pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token, Error> {
+    pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token> {
         match token.0.refresh_token {
-            Some(t) => self
-                .0
+            Some(t) => self.0
                 .exchange_refresh_token(t)
                 .map_err(|e| Error::AuthToken(e)),
             None => Err(Error::RefreshTokenMissing),
