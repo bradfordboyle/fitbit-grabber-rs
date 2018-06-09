@@ -1,5 +1,6 @@
 extern crate chrono;
 extern crate clap;
+extern crate env_logger;
 extern crate fitbit;
 extern crate oauth2;
 extern crate reqwest;
@@ -20,15 +21,19 @@ use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::str::FromStr;
 
 use chrono::NaiveDate;
 use clap::{App, Arg, SubCommand};
 
 mod config;
 use config::Config;
+use fitbit::activities::Activities;
+use fitbit::date;
 use fitbit::user::User;
 
 fn main() -> Result<(), Error> {
+    env_logger::init();
     let default_dir = Path::new(&env::var("HOME")?).join(".config/fitbit-grabber");
     let default_config = default_dir.clone().join("conf.toml");
     let date_arg = Arg::with_name("date")
@@ -63,6 +68,11 @@ fn main() -> Result<(), Error> {
         .subcommand(SubCommand::with_name("token").about("request an access token"))
         .subcommand(SubCommand::with_name("refresh-token").about("refresh token"))
         .subcommand(SubCommand::with_name("user").about("get user profile"))
+        .subcommand(
+            SubCommand::with_name("daily-activity-summary")
+                .about("get daily activity summary")
+                .arg(date_arg.clone()),
+        )
         .get_matches();
 
     let conf = Config::load(matches.value_of("config"))?;
@@ -109,6 +119,15 @@ fn main() -> Result<(), Error> {
     if let Some(_) = matches.subcommand_matches("user") {
         let profile = f.get_user_profile()?;
         println!("{:?}", profile);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("daily-activity-summary") {
+        let raw_date = matches
+            .value_of("date")
+            .ok_or(format_err!("please give a starting date"))?;
+        let date = date::Date::from_str(raw_date)?;
+        let summary = f.get_daily_activity_summary("-", &date)?;
+        println!("{}", summary);
     }
 
     Ok(()) // ok!
