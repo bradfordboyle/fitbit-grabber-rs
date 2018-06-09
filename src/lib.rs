@@ -42,7 +42,7 @@ impl FitbitClient {
         headers.set(Authorization(Bearer {
             token: token.0.access_token,
         }));
-        headers.set(UserAgent::new("fitbit-grabber-rs (0.1.0)"));
+        headers.set(UserAgent::new("fitbit-rs (0.1.0)"));
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
@@ -104,7 +104,6 @@ impl FitbitAuth {
     pub fn new(client_id: &str, client_secret: &str) -> FitbitAuth {
         let auth_url = "https://www.fitbit.com/oauth2/authorize";
         let token_url = "https://api.fitbit.com/oauth2/token";
-        // let token_url = "http://localhost:8080";
 
         // Set up the config for the Github OAuth2 process.
         let mut config = OAuth2Config::new(client_id, client_secret, auth_url, token_url);
@@ -120,6 +119,7 @@ impl FitbitAuth {
 
         // This example will be running its own server at localhost:8080.
         // See below for the server implementation.
+        // TODO configurable redirect?
         config = config.set_redirect_url("http://localhost:8080");
 
         FitbitAuth(config)
