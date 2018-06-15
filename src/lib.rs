@@ -22,6 +22,7 @@ pub mod body;
 pub mod date;
 pub mod errors;
 pub mod query;
+pub mod serializers;
 pub mod user;
 
 use errors::Error;
@@ -56,10 +57,12 @@ impl FitbitClient {
     }
 
     pub fn user(&self) -> Result<String> {
-        let url = self.base
+        let url = self
+            .base
             .join("user/-/profile.json")
             .map_err(|e| Error::Url(e))?;
-        Ok(self.client
+        Ok(self
+            .client
             .request(reqwest::Method::Get, url)
             .send()
             .and_then(|mut r| r.text())?)
@@ -84,7 +87,8 @@ impl FitbitClient {
             date.format("%Y-%m-%d")
         );
         let url = self.base.join(&path).map_err(|e| Error::Url(e))?;
-        Ok(self.client
+        Ok(self
+            .client
             .request(Method::Get, url)
             .send()
             .and_then(|mut r| r.text())
@@ -178,7 +182,8 @@ impl FitbitAuth {
 
     pub fn exchange_refresh_token(&self, token: Token) -> Result<oauth2::Token> {
         match token.0.refresh_token {
-            Some(t) => self.0
+            Some(t) => self
+                .0
                 .exchange_refresh_token(t)
                 .map_err(|e| Error::AuthToken(e)),
             None => Err(Error::RefreshTokenMissing),

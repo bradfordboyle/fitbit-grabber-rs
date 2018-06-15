@@ -2,6 +2,7 @@ use super::FitbitClient;
 use chrono::NaiveDate;
 use errors::Error;
 use query::DateQuery;
+use serializers::naive_date;
 
 pub trait Body {
     fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
@@ -32,7 +33,7 @@ impl Body for FitbitClient {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WeightSeries {
     #[serde(rename = "dateTime")]
-    #[serde(with = "date_serde")]
+    #[serde(with = "naive_date")]
     pub date: Option<NaiveDate>,
     pub value: String,
 }
@@ -57,33 +58,4 @@ pub struct Weight {
     pub time: String,
     pub weight: f64,
     pub source: String,
-}
-
-mod date_serde {
-    use chrono::NaiveDate;
-    use serde::{self, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(date: &Option<NaiveDate>, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if let Some(ref d) = *date {
-            return s.serialize_str(&d.format("%Y-%m-%d").to_string());
-        }
-        s.serialize_none()
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: Option<String> = Option::deserialize(deserializer)?;
-        if let Some(s) = s {
-            return Ok(Some(
-                NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)?
-            ));
-        }
-
-        Ok(None)
-    }
 }
