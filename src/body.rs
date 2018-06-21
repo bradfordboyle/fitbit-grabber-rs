@@ -1,6 +1,8 @@
 use super::FitbitClient;
+use chrono::NaiveDate;
 use errors::Error;
 use query::DateQuery;
+use serializers::naive_date;
 
 pub trait Body {
     fn get_body_time_series(&self, DateQuery) -> Result<WeightSeriesResult, Error>;
@@ -23,14 +25,16 @@ impl Body for FitbitClient {
             ),
             _ => unimplemented!(), // TODO: missing an error type?
         };
-        Ok(self.client.get(&url).send()?.json()?)
+        let url = self.base.join(&url)?;
+        Ok(self.client.get(url).send()?.json()?)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WeightSeries {
     #[serde(rename = "dateTime")]
-    pub date: String,
+    #[serde(with = "naive_date")]
+    pub date: Option<NaiveDate>,
     pub value: String,
 }
 
