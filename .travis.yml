@@ -11,8 +11,10 @@ rust:
   - beta
   - stable
 
+before_script:
+  - (rustup component add rustfmt-preview || true)
 
 script:
-  - cargo clean
+  - if [[ "${TRAVIS_RUST_VERSION}" == stable ]]; then cargo fmt --all -- --write-mode=check; fi
   - cargo build
   - cargo test
