@@ -19,7 +19,7 @@ pub mod naive_date {
         let s: Option<String> = Option::deserialize(deserializer)?;
         if let Some(s) = s {
             return Ok(Some(
-                NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)?,
+                NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)?
             ));
         }
 
